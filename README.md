@@ -64,4 +64,4 @@ The aggregate source data should be stored in a .txt, .csv, or .xls file
 
 
 ## Following Configuration:
-Once all dependencies are installed and configurations are completed in the config.py file, the user needs only to execute the * Analysis.py * file.
+Once all dependencies are installed and configurations are completed in the config.py file, the user needs only to execute the **Analysis.py** file.
