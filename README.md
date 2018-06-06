@@ -46,5 +46,22 @@ The aggregate source data should be stored in a .txt, .csv, or .xls file
 - count (see config.py file)
 - site (see config.py file)
 - missing (see config.py file)
+- api_key
+
+### The following fields in the config.py file may optionally be configured:
+- delim
+- write_file_source_data_cleaning
+- write_file_loinc_parsed
+- write_file_umls_cuis
+- rejection_threshold
+- num_cuis
+- min_sites_per_loinc_key
+- min_tests_per_loinc_group
+- min_row_count_per_loinc_group
+- run_cv
+- n_splits
+- tuning_evals
 
 
+## Following Configuration:
+Once all dependencies are installed and configurations are completed in the config.py file, the user needs only to execute the * Analysis.py * file.
