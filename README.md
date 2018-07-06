@@ -61,6 +61,11 @@ The aggregate source data should be stored in a .txt, .csv, or .xls file
 - run_cv
 - n_splits
 - tuning_evals
+- max_features 
+- max_depth
+- min_samples_split
+- n_estimators 
+
 
 
 ## Following Configuration:
