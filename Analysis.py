@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[1]:
 
 get_ipython().magic('matplotlib inline')
 import pandas as pd
@@ -239,15 +239,6 @@ test_ind, tune_train_ind, tune_test_ind = get_indices()
 
 
 
-# In[25]:
-
-### GET RID OF THIS FOR FINAL VERSION ###
-site_splits = [[358], [402], [405], [436], [437]]
-X0 = X0[X0.Sta3n.isin(np.concatenate(site_splits))]
-unknowns_analysis = unknowns_analysis[unknowns_analysis.Sta3n.isin(np.concatenate(site_splits))]
-### END OF CODE DELETION
-
-
 # ### Create dictionary for hyperparameters for hyperopt package
 
 # In[30]:
@@ -262,6 +253,25 @@ space4rf = {key: hp.choice(key, spacedict[key]) for key in spacedict.keys()}
 
 
 # ## User hyperopt package to tune RF hyperparameters
+
+# In[ ]:
+
+def rf_hyperopt_train_test(rf_params):
+    score_rf = []
+    if rf_trials.trials[-1]['tid'] % 5 == 0:
+        print('Trial: ', rf_trials.trials[-1]['tid'])
+    for i in range(N_SPLITS):
+        clf = RandomForestClassifier(random_state=seed, n_jobs=-1, **rf_params)
+        X_train = X0.iloc[np.concatenate(tune_train_ind[:i] + tune_train_ind[i + 1:])].drop([config.site, config.loinc_col], axis=1)
+        y_train = X_train.pop('LOINC_KEY')
+        X_test = X0.iloc[np.concatenate(tune_test_ind[:i] + tune_test_ind[i + 1:])].drop([config.site, config.loinc_col], axis=1)
+        y_test = X_test.pop('LOINC_KEY')
+        clf.fit(X_train, y_train)
+        y_preds = clf.predict(X_test)
+        score_rf.append(f1_score(y_test, y_preds, labels=clf.classes_, average='weighted'))
+        del clf
+    return np.mean(score_rf)
+
 
 # In[31]:
 
