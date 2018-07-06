@@ -141,3 +141,22 @@ n_splits = 5
 ## Enter the integer number of trials for hyperparameter tuning (default is 200)
 tuning_evals = 200
 
+## Values for hyperopt model hyperparameter tuning. User has the option to customize the search space for the following random forest parameters: max_features, max_depth, min_samples_split, and n_estimators.
+
+## Default setting is for max_features to be tested in increments of 2 over the space from 2 features to N - 3 features (where N is the number of columns in the training dataset), represented in the code by np.arange(2, (X0.shape[1] - 3), 2). If the user wants to modify the search space, please change the following line of code to:  max_features = [MINIMUM NUMBER, MAXIMUM NUMBER, INCREMENT]
+## Example: max_features = [2, 24, 2]
+max_features = None
+
+## Default setting is for max_depth to be tested in increments of 5 over the space from 5 to 25, represented programatically as np.arange(5, 35, 5). If the user wants to modify the search space, please change the following line of code to: max_depth = [MINIMUM DEPTH, MAXIMUM DEPTH, INCREMENT]
+## Example: max_depth = [5, 50, 5]
+max_depth = None
+
+## Default setting is for min_samples_split to be tested in increments of 2 over the space from 2 to 20, represented programatically as np.arange(2, 20, 2). If the user wants to modify the search space, please change the following line of code to: min_samples_split = [MINIMUM SAMPLES, MAXIMUM SAMPLES, INCREMENT]
+## Example: min_samples_split = [2, 16, 1]
+min_samples_split = None
+
+## Default setting is for n_estimators to be tested in increments of 25 over the space from 10 to 250, represented programatically as np.arange(10, 250, 25). If the user wants to modify the search space, please change the following line of code to: n_estimators = [MINIMUM ESTIMATORS, MAXIMUM ESTIMATORS, INCREMENT]
+## Example: n_estimators = [10, 250, 25]
+
+n_estimators = None
+

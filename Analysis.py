@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 get_ipython().magic('matplotlib inline')
 import pandas as pd
@@ -22,30 +22,30 @@ from collections import defaultdict
 import seaborn as sb
 import config
 from LOINCSynonyms import *
-from DatasetCreationConfigd import *
+from DatasetCreation import *
 
 
-# In[3]:
+# In[ ]:
 
 import warnings
 warnings.filterwarnings(action='ignore', category= classification.UndefinedMetricWarning)
 
 
-# In[4]:
+# In[ ]:
 
 seed = 12341
 N_SPLITS = config.n_splits
 TUNING_EVALS = config.tuning_evals
 
 
-# In[5]:
+# In[ ]:
 
 filepath = config.out_dir
 
 
 # ### Load LOINC Synonymn dictionary
 
-# In[6]:
+# In[ ]:
 
 def get_loinc_dict(loinc_synonyms):
     loinc_dict = defaultdict()
@@ -56,7 +56,7 @@ def get_loinc_dict(loinc_synonyms):
 
 # ### Load Data Cube
 
-# In[7]:
+# In[ ]:
 
 def get_data():
     if os.path.exists(filepath + 'datCube.csv'):
@@ -67,7 +67,7 @@ def get_data():
     return dat
 
 
-# In[8]:
+# In[ ]:
 
 def transform_and_filter_data():
     dat = get_data()
@@ -151,7 +151,7 @@ def transform_and_filter_data():
 
 # ### Agnostic site-splitting (does not ensure that test labels are present in training data)
 
-# In[8]:
+# In[ ]:
 
 def get_site_splits():
     n_splits = N_SPLITS
@@ -178,7 +178,7 @@ def get_site_splits():
     return site_splits
 
 
-# In[9]:
+# In[ ]:
 
 def get_indices():
     test_ind = []
@@ -200,7 +200,7 @@ def get_indices():
 
 
 
-# In[10]:
+# In[ ]:
 
 label_encoder_dict, loinc_coder, X_unfiltered, X_labeled, unknowns = transform_and_filter_data()
 
@@ -228,7 +228,7 @@ unknowns_analysis = unknowns[data_cols]
 
 
 
-# In[11]:
+# In[ ]:
 
 ## Get indices for hyperparameter tuning so that the test set data is not used during evaluating hyperparameters
 test_ind, tune_train_ind, tune_test_ind = get_indices()
@@ -241,13 +241,17 @@ test_ind, tune_train_ind, tune_test_ind = get_indices()
 
 # ### Create dictionary for hyperparameters for hyperopt package
 
-# In[30]:
+# In[ ]:
 
 spacedict = {'criterion': ['gini', 'entropy'],
-           'max_features': np.arange(2, (X0.shape[1] - 3), 2),
-           'max_depth': np.arange(5, 35, 5),
-           'min_samples_split': np.arange(2, 20, 2),
-           'n_estimators': np.array([10, 20, 50, 75, 100, 125, 150, 175, 200])}
+           'max_features': np.arange(2, 22, 2) if config.max_features is None else np.arange(config.max_features[0],
+                config.max_features[1], config.max_features[2]),
+           'max_depth': np.arange(5, 35, 5) if config.max_depth is None else np.arange(config.max_depth[0], config.max_depth[1],
+                config.max_depth[2]),
+           'min_samples_split': np.arange(2, 20, 2) if config.min_samples_split is None else np.arange(config.min_samples_split[0],
+                config.min_samples_split[1], config.min_samples_split[2]),
+           'n_estimators': np.arange(10, 250, 25) if config.n_estimators is None else np.arange(config.n_estimators[0],
+                config.n_estimators[1], config.n_estimators[2])}
 
 space4rf = {key: hp.choice(key, spacedict[key]) for key in spacedict.keys()}
 
@@ -273,7 +277,7 @@ def rf_hyperopt_train_test(rf_params):
     return np.mean(score_rf)
 
 
-# In[31]:
+# In[ ]:
 
 def rf_f(rf_params):
     global rf_best
@@ -286,7 +290,7 @@ def rf_f(rf_params):
     return {'loss': -f1, 'status': STATUS_OK}
 
 
-# In[32]:
+# In[ ]:
 
 def get_rf_trials():
     rf_best = 0
@@ -308,7 +312,7 @@ def get_rf_trials():
     return rf_trials
 
 
-# In[33]:
+# In[ ]:
 
 rf_trials = get_rf_trials()
 
@@ -320,7 +324,7 @@ for key in rf_trials.best_trial['misc']['vals'].keys():
 
 # ## User hyperopt package to tune RF hyperparameters for OVR 
 
-# In[34]:
+# In[ ]:
 
 def ovr_hyperopt_train_test(ovr_params):
     score_ovr = []
@@ -339,7 +343,7 @@ def ovr_hyperopt_train_test(ovr_params):
     return np.mean(score_ovr)
 
 
-# In[35]:
+# In[ ]:
 
 def ovr_f(ovr_params):
     global ovr_best
@@ -352,7 +356,7 @@ def ovr_f(ovr_params):
     return {'loss': -f1, 'status': STATUS_OK}
 
 
-# In[36]:
+# In[ ]:
 
 def get_ovr_trials():
     ovr_best = 0
@@ -374,7 +378,7 @@ def get_ovr_trials():
     return ovr_trials
 
 
-# In[37]:
+# In[ ]:
 
 ovr_trials = get_ovr_trials()
 
@@ -386,7 +390,7 @@ for key in ovr_trials.best_trial['misc']['vals'].keys():
 
 # ## Get performance estimates for models after hyperparameters tuned
 
-# In[38]:
+# In[ ]:
 
 def run_cv(X0, unknowns_analysis):
     metric_names = ['Accuracy', 'F1 weighted', 'F1 macro', 'F1 micro']
@@ -489,7 +493,7 @@ def run_cv(X0, unknowns_analysis):
     return X_cvs, X_unk_cvs, metrics
 
 
-# In[39]:
+# In[ ]:
 
 if config.run_cv == 'Y':
     X_cvs, X_unk_cvs, cv_metrics = run_cv(X0, unknowns_analysis)
@@ -497,7 +501,7 @@ if config.run_cv == 'Y':
 
 # ## Fit model to full labeled dataset, make predictions, then make predictions on unlabeled dataset
 
-# In[40]:
+# In[ ]:
 
 X_overall = X0.drop([config.site, config.loinc_col, 'LOINC_KEY'], axis=1)
 y_overall = X0['LOINC_KEY']
@@ -533,20 +537,20 @@ ovr_unknown_preds = ovr_final.predict(X_unk_overall)
 ovr_unk_preds_frame = pd.DataFrame(ovr_unknown_preds, index=X_unk_overall.index, columns=['OVRFullModelPredLOINCKey'])
 
 
-# In[41]:
+# In[ ]:
 
 if config.run_cv == 'Y':
     X0 = X_cvs.copy()
     unknowns_analysis = X_unk_cvs.copy()
 
 
-# In[64]:
+# In[ ]:
 
 X_final = X0.merge(rf_preds_frame, how='inner', left_index=True, right_index=True)     .merge(ovr_preds_frame, how='inner', left_index=True, right_index=True)
 unknowns_final = unknowns_analysis.merge(rf_unk_preds_frame, how='inner', left_index=True, right_index=True)     .merge(ovr_unk_preds_frame, how='inner', left_index=True, right_index=True)
 
 
-# In[65]:
+# In[ ]:
 
 ## If original LOINC code is a member of the predicted LOINC_KEY, retain the original LOINC code as the 
 ## final label
@@ -558,12 +562,12 @@ X_final['OVRFullModelFinalLOINCKey'] = np.where(~(X_final[config.loinc_col] == X
             X_final[config.loinc_col], X_final['OVRFullModelPredLOINCKey'])
 
 
-# In[66]:
+# In[ ]:
 
 cols_to_transform = X_final.columns[X_final.columns.isin(label_encoder_dict.keys())]
 
 
-# In[67]:
+# In[ ]:
 
 ## Inverse transforms factor variables back to original data
 X_final[cols_to_transform] = X_final[cols_to_transform]     .apply(lambda x: label_encoder_dict[x.name].inverse_transform(x))
@@ -580,7 +584,7 @@ X_final[[config.loinc_col, 'LOINC_KEY', 'RFFullModelPredLOINCKey', 'OVRFullModel
 unknowns_final[[config.loinc_col, 'RFFullModelPredLOINCKey', 'OVRFullModelPredLOINCKey']] = loinc_coder     .inverse_transform(unknowns_final[[config.loinc_col, 'RFFullModelPredLOINCKey', 'OVRFullModelPredLOINCKey']])
 
 
-# In[68]:
+# In[ ]:
 
 X_final = X_labeled[[config.site, config.test_col, 'CleanedTestName', config.spec_col, 'CleanedSpecimen', 
     config.count, config.loinc_col, 'LOINC_KEY']] \
