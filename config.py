@@ -157,6 +157,5 @@ min_samples_split = None
 
 ## Default setting is for n_estimators to be tested in increments of 25 over the space from 10 to 250, represented programatically as np.arange(10, 250, 25). If the user wants to modify the search space, please change the following line of code to: n_estimators = [MINIMUM ESTIMATORS, MAXIMUM ESTIMATORS, INCREMENT]
 ## Example: n_estimators = [10, 250, 25]
-
 n_estimators = None
 
