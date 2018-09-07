@@ -21,6 +21,8 @@ def group_func(group):
 # In[3]:
 
 def get_loinc_groups():
+    if config.print_status == 'Y':
+        print('Processing LOINC synonyms')
     raw_loinc_dat = pd.read_csv(config.loinc_file_path, 
         usecols=['LOINC_NUM', 'COMPONENT', 'PROPERTY', 'TIME_ASPCT', 'SYSTEM', 'METHOD_TYP',
            'SCALE_TYP', 'STATUS', 'CLASSTYPE', 'VersionLastChanged'], low_memory=False)
