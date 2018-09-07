@@ -242,11 +242,15 @@ test_ind, tune_train_ind, tune_test_ind = get_indices()
 
 # In[30]:
 
-spacedict = {'criterion': ['gini', 'entropy'],
-           'max_features': np.arange(2, (X0.shape[1] - 3), 2),
-           'max_depth': np.arange(5, 35, 5),
-           'min_samples_split': np.arange(2, 20, 2),
-           'n_estimators': np.array([10, 20, 50, 75, 100, 125, 150, 175, 200])}
+spacedict = {'criterion': ['gini', 'entropy'], 
+            'max_features': np.arange(2, 22, 2) if config.max_features is None else np.arange(config.max_features[0],
+                config.max_features[1], config.max_features[2]), 
+            'max_depth': np.arange(5, 35, 5) if config.max_depth is None else np.arange(config.max_depth[0], config.max_depth[1],
+                config.max_depth[2]),
+            'min_samples_split': np.arange(2, 20, 2) if config.min_samples_split is None else np.arange(config.min_samples_split[0],
+                config.min_samples_split[1], config.min_samples_split[2]),
+            'n_estimators': np.arange(10, 250, 25) if config.n_estimators is None else np.arange(config.n_estimators[0],
+                config.n_estimators[1], config.n_estimators[2])}
 
 space4rf = {key: hp.choice(key, spacedict[key]) for key in spacedict.keys()}
 
