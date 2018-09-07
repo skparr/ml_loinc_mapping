@@ -3,7 +3,6 @@
 
 # In[1]:
 
-get_ipython().magic('matplotlib inline')
 import pandas as pd
 import numpy as np
 import os
@@ -39,10 +38,15 @@ def build_cube():
                                   na_values=config.missing)
     else:
         cleaned_tests, cleaned_specimen = import_source_data()
-        
+    
     agg_source_data[config.test_col] = agg_source_data[config.test_col].str.strip().str.upper()
     agg_source_data[config.spec_col] = agg_source_data[config.spec_col].str.strip().str.upper()
     agg_source_data[config.units] = agg_source_data[config.units].str.strip().str.upper()
+
+    if agg_source_data[config.site].dtypes != cleaned_specimen['Site'].dtypes:
+        agg_source_data[config.site] = agg_source_data[config.site].astype(str)
+        cleaned_specimen.Site = cleaned_specimen.Site.astype(str)
+        cleaned_tests.Site = cleaned_tests.Site.astype(str)
     
     joined_dat = agg_source_data.merge(cleaned_tests, how='left', left_on=[config.site, config.test_col], 
                                    right_on=['Site', 'OriginalTestName'])
@@ -76,7 +80,7 @@ def compile_cuis(data):
 
 def add_cuis_to_cube(dat):
     if config.print_status == 'Y':
-        print('Obtaining UMLS CUIs')
+        print('Adding UMLS CUIs')
     feature_col_number = config.num_cuis
     if (os.path.exists(config.out_dir + "UMLS_Mapped_Specimen_Names.csv") and 
         os.path.exists(config.out_dir + "UMLS_Mapped_Test_Names.csv")):
@@ -110,8 +114,9 @@ short_to_long, parsed_loinc_fields = parse_loinc()
 
 # In[6]:
 
-## NOTE: This can be moved to a csv file
 def map_loinc_system():
+    if config.print_status == 'Y':
+        print('Mapping LOINC System')
     if os.path.exists(config.out_dir + "LOINC_System_to_Long.csv"):
         system_map = pd.read_csv(config.out_dir + "LOINC_System_to_Long.csv", sep="|")
     else:
@@ -190,6 +195,9 @@ def combine_loinc_mapping():
                               loincmap[loincmap['Token'].isnull()]['SystemToken'])
     loincmap = loincmap.set_value(loincmap[loincmap['TokenMap'].isnull()].index, 'TokenMap', 
                               loincmap[loincmap['TokenMap'].isnull()]['SystemMap'])
+    
+    if config.print_status == 'Y':
+        print('Generating LOINC Groups')
     loincmap = loincmap.groupby('Token').apply(group_func)
     loincmap = loincmap[['Token', 'FinalTokenMap']].drop_duplicates().reset_index(drop=True)
     return loincmap
@@ -200,13 +208,18 @@ def combine_loinc_mapping():
 # Find best string matches between source data test or specimen tokens and mappings from LOINC short name to
 # LOINC long name words
 def get_matches(data_col, loincmap):
+    if config.print_status == 'Y':
+        print('String Distance Matching Source Data Terms to LOINC')
     robjects.numpy2ri.activate()
     stringdist = importr('stringdist', lib_loc=config.lib_loc)
     tokenized_list = [data_col[k].split() for k in range(len(data_col))]
     longest_phrase = len(max(tokenized_list, key=len))
     match_matrix_LV = pd.DataFrame(np.nan, index=data_col, columns=range(longest_phrase))
     match_matrix_JW = pd.DataFrame(np.nan, index=data_col, columns=range(longest_phrase))
-    for i in range(len(tokenized_list)):
+    rows = len(tokenized_list)
+    for i in range(rows):
+        if config.print_status == 'Y' and i % 500 == 0:
+            print('Matching Term', i, '/', rows)
         for j in range(len(tokenized_list[i])):
             if not pd.isnull(tokenized_list[i][j]):
                 dists_LV = stringdist.stringdist(tokenized_list[i][j], loincmap.Token.values, method='lv')
@@ -245,6 +258,8 @@ def add_string_distance_features():
     test_match_matrix_LV, test_match_matrix_JW = get_matches(unique_tests, loincmap)
     spec_match_matrix_LV, spec_match_matrix_JW = get_matches(unique_specimen_types, loincmap)
 
+    if config.print_status == 'Y':
+        print('Concatenating String Match Results')
     concat_lv_test_match_result = concatenate_match_results(test_match_matrix_LV, 1)
     concat_jw_test_match_result = concatenate_match_results(test_match_matrix_JW, 1)
     concat_lv_spec_match_result = concatenate_match_results(spec_match_matrix_LV, 2)
@@ -269,7 +284,9 @@ def add_string_distance_features():
     loinc_comp_syst.ExpandedSystem = loinc_comp_syst.ExpandedSystem.astype(object)
     
     loinc_num_set = loinc_comp_syst.LOINC.unique()
-    
+
+    if config.print_status == 'Y':
+        print('Generating LOINC System Field Expansion')
     for i in range(loinc_comp_syst.shape[0]):
         if not pd.isnull(loinc_comp_syst.System[i]):
             loinc_comp_syst.set_value(i, 'System', loinc_comp_syst.System[i].split(" "))
@@ -289,8 +306,15 @@ def add_string_distance_features():
     
     robjects.numpy2ri.activate()
     stringdist = importr('stringdist', lib_loc="C://Program Files/R/R-3.4.1/library")
-    
-    for i in range(unique_combos.shape[0]):
+
+    if config.print_status == 'Y':
+        print('String Distance Matching to LOINC Component and System')
+
+    nrows = unique_combos.shape[0]
+
+    for i in range(nrows):
+        if i % 500 == 0 and config.print_status == 'Y':
+            print('Matching', i, '/', nrows)
         matches = stringdist.stringdist(unique_combos.loc[i, 'TestNameMapJW'], unique_components,
             method='jw', p=0)
         bestmatch = np.argmin(matches)
