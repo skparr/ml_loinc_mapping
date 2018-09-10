@@ -305,7 +305,7 @@ def add_string_distance_features():
                'PredictedSystemJW', 'SystemMatchDistJW', 'PredictedSystemLV', 'SystemMatchDistLV']])])
     
     robjects.numpy2ri.activate()
-    stringdist = importr('stringdist', lib_loc="C://Program Files/R/R-3.4.1/library")
+    stringdist = importr('stringdist', lib_loc=config.lib_loc)
 
     if config.print_status == 'Y':
         print('String Distance Matching to LOINC Component and System')
