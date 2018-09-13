@@ -86,13 +86,20 @@ def parse_loinc():
     longParsed = list()
     for fields in reader:
         index = index + 1
-        if index == 0: continue
-        loincNum = fields[0]
-        component = fields[1].upper()
-        system = fields[4].upper();
-        shortName = fields[22].upper();
-        longName = fields[28].upper();
-        classType = fields[13];
+        if index == 0:
+            loincNumInd = fields.index('LOINC_NUM')
+            componentInd = fields.index('COMPONENT')
+            systemInd = fields.index('SYSTEM')
+            shortNameInd = fields.index('SHORTNAME')
+            longNameInd = fields.index('LONG_COMMON_NAME')
+            classTypeInd = fields.index('CLASSTYPE')
+            continue
+        loincNum = fields[loincNumInd]
+        component = fields[componentInd].upper()
+        system = fields[systemInd].upper();
+        shortName = fields[shortNameInd].upper();
+        longName = fields[longNameInd].upper();
+        classType = fields[classTypeInd];
         if classType != "1" and classType != "2": continue  #only keep the lab and clinical class types
         loincs.append(loincNum)
         shortWords = clean_terms(shortName)
