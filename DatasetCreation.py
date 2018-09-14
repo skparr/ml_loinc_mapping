@@ -15,7 +15,7 @@ import rpy2.robjects as robjects
 from MapLOINCFields import *
 from CleanTestsAndSpecimens import *
 from APISearchRequests import *
-import rpy2.robjects.numpy2ri
+import rpy2.robjects.numpy2ri as numpy2ri
 from rpy2.robjects.packages import importr
 
 
@@ -53,7 +53,8 @@ def build_cube():
     joined_dat = joined_dat.merge(cleaned_specimen, how='left', left_on=[config.site, config.spec_col], 
                                  right_on=['Site', 'OriginalSpecimen'])
     joined_dat = joined_dat.drop(['Site_x', 'Site_y', 'OriginalTestName', 'OriginalSpecimen'], axis=1)
-    
+    joined_dat = joined_dat[(~(joined_dat[config.test_col].isnull())) & (~(joined_dat[config.spec_col].isnull()))]
+
     ## Get total # of lab results per site, create normalized 'FreqPercent' variable
     joined_dat = joined_dat.merge(pd.Series.to_frame(joined_dat.groupby(config.site)[config.count].sum(), name='TotalCount').reset_index(),
                                  how='inner', left_on=config.site, right_on=config.site)
@@ -69,10 +70,10 @@ def build_cube():
 def compile_cuis(data):
     master_list = defaultdict(list)
     for i in range(data.shape[0]):
-        if data.loc[i, 'SourceTerm'] not in master_list:
-            master_list[data.loc[i, 'SourceTerm']].append(data.loc[i, 'CUI'])
-        if data.loc[i, 'CUI'] not in master_list[data.loc[i, 'SourceTerm']]:
-            master_list[data.loc[i, 'SourceTerm']].append(data.loc[i, 'CUI'])
+        if data.at[i, 'SourceTerm'] not in master_list:
+            master_list[data.at[i, 'SourceTerm']].append(data.at[i, 'CUI'])
+        if data.at[i, 'CUI'] not in master_list[data.at[i, 'SourceTerm']]:
+            master_list[data.at[i, 'SourceTerm']].append(data.at[i, 'CUI'])
     return master_list
 
 
@@ -120,7 +121,7 @@ def map_loinc_system():
     if os.path.exists(config.out_dir + "LOINC_System_to_Long.csv"):
         system_map = pd.read_csv(config.out_dir + "LOINC_System_to_Long.csv", sep="|")
     else:
-        robjects.numpy2ri.activate()
+        numpy2ri.activate()
         stringdist = importr('stringdist', lib_loc=config.lib_loc)
         loinc_syst = parsed_loinc_fields[['System', 'LongName']]
         loinc_syst = loinc_syst[(~pd.isnull(loinc_syst.System)) & (loinc_syst.System != '')].reset_index(drop=True)
@@ -131,13 +132,14 @@ def map_loinc_system():
         system_df = pd.DataFrame(0, index=system_tokens, columns=longname_tokens)
         n_rows = loinc_syst.shape[0]
         for i in range(n_rows):
-            for j in range(len(loinc_syst.System[i])):
-                dists = stringdist.stringdist(loinc_syst.System[i][j], loinc_syst.LongName[i], method = 'jw', p=0)
+            for j, term in enumerate(loinc_syst.System[i]):
+                dists = stringdist.stringdist(term, loinc_syst.LongName[i], method = 'jw', p=0)
                 bestMatch = loinc_syst.LongName[i][np.argmin(dists)]
-                system_df.loc[loinc_syst.System[i][j], bestMatch] = system_df.loc[loinc_syst.System[i][j], bestMatch] + 1
+                system_df.loc[term, bestMatch] = system_df.loc[term, bestMatch] + 1
         high_count = system_df.idxmax(axis=1).values
         system_map = pd.DataFrame({'SystemToken': system_tokens, 'SystemMap': high_count})
-        system_map.to_csv(config.out_dir + "LOINC_System_to_Long.csv", sep="|", index=False)
+        if config.write_file_loinc_parsed:
+            system_map.to_csv(config.out_dir + "LOINC_System_to_Long.csv", sep="|", index=False)
     return system_map
 
 
@@ -191,10 +193,9 @@ def combine_loinc_mapping():
     system_map_final = map_loinc_system()
     loinc_terms_max = map_loinc_token_counts()
     loincmap = system_map_final.merge(loinc_terms_max, how='outer', left_on='SystemToken', right_on='Token')
-    loincmap = loincmap.set_value(loincmap[loincmap['Token'].isnull()].index, 'Token', 
-                              loincmap[loincmap['Token'].isnull()]['SystemToken'])
-    loincmap = loincmap.set_value(loincmap[loincmap['TokenMap'].isnull()].index, 'TokenMap', 
-                              loincmap[loincmap['TokenMap'].isnull()]['SystemMap'])
+    loincmap.loc[loincmap.Token.isnull(), 'Token'] = loincmap.loc[loincmap.Token.isnull(), 'SystemToken']
+    loincmap.loc[loincmap.TokenMap.isnull(), 'TokenMap'] = loincmap.loc[loincmap.TokenMap.isnull(), 'SystemMap']
+
     
     if config.print_status == 'Y':
         print('Generating LOINC Groups')
@@ -210,7 +211,7 @@ def combine_loinc_mapping():
 def get_matches(data_col, loincmap):
     if config.print_status == 'Y':
         print('String Distance Matching Source Data Terms to LOINC')
-    robjects.numpy2ri.activate()
+    numpy2ri.activate()
     stringdist = importr('stringdist', lib_loc=config.lib_loc)
     tokenized_list = [data_col[k].split() for k in range(len(data_col))]
     longest_phrase = len(max(tokenized_list, key=len))
@@ -239,9 +240,9 @@ def concatenate_match_results(input_matrix, data_type):
             if not pd.isnull(input_matrix.iloc[i, j]):
                 input_matrix.iloc[i, 0] = input_matrix.iloc[i, 0] + " " + input_matrix.iloc[i, j]
     if data_type == 1:
-        return pd.DataFrame(input_matrix.iloc[:, 0], columns=['TestNameMap'])
+        return pd.DataFrame(input_matrix.iloc[:, 0].values, index=input_matrix.index, columns=['TestNameMap'])
     else:
-        return pd.DataFrame(input_matrix.iloc[:, 0], columns=['SpecimenMap'])
+        return pd.DataFrame(input_matrix.iloc[:, 0].values, index=input_matrix.index, columns=['SpecimenMap'])
 
 
 # In[12]:
@@ -287,24 +288,27 @@ def add_string_distance_features():
 
     if config.print_status == 'Y':
         print('Generating LOINC System Field Expansion')
-    for i in range(loinc_comp_syst.shape[0]):
+    rows = loinc_comp_syst.shape[0]
+    for i in range(rows):
+        if config.print_status == 'Y' and i % 5000 == 0:
+            print('Row', i, '/', rows)
         if not pd.isnull(loinc_comp_syst.System[i]):
-            loinc_comp_syst.set_value(i, 'System', loinc_comp_syst.System[i].split(" "))
-            for j in range(len(loinc_comp_syst.System[i])):
-                mapped_term = loincmap.loc[loincmap.Token == loinc_comp_syst.System[i][j], 'FinalTokenMap'].values[0]
+            loinc_comp_syst.at[i, 'System'] = loinc_comp_syst.System[i].split(" ")
+            for term in loinc_comp_syst.System[i]:
+                mapped_term = loincmap.loc[loincmap.Token == term, 'FinalTokenMap'].values[0]
                 if pd.isnull(loinc_comp_syst.ExpandedSystem[i]):
-                    loinc_comp_syst.set_value(i, 'ExpandedSystem', mapped_term)
+                    loinc_comp_syst.at[i, 'ExpandedSystem'] = mapped_term
                 else:
-                    loinc_comp_syst.loc[i, 'ExpandedSystem'] = loinc_comp_syst.ExpandedSystem[i] + " " + mapped_term
-                
+                    loinc_comp_syst.at[i, 'ExpandedSystem'] = loinc_comp_syst.ExpandedSystem[i] + " " + mapped_term
+
     unique_combos = dat[['TestNameMapJW', 'SpecimenMapJW', 'TestNameMapLV', 'SpecimenMapLV']].drop_duplicates().reset_index(drop=True)
     unique_components = loinc_comp_syst.Component.unique()
     unique_system = loinc_comp_syst[~pd.isnull(loinc_comp_syst.ExpandedSystem)].ExpandedSystem.unique()
     
-    unique_combos = pd.concat([unique_combos, pd.DataFrame(columns=[['PredictedComponentJW', 'ComponentMatchDistJW', 'PredictedComponentLV', 'ComponentMatchDistLV', 
-               'PredictedSystemJW', 'SystemMatchDistJW', 'PredictedSystemLV', 'SystemMatchDistLV']])])
+    unique_combos = pd.concat([unique_combos, pd.DataFrame(columns=['PredictedComponentJW', 'ComponentMatchDistJW', 'PredictedComponentLV', 'ComponentMatchDistLV', 
+               'PredictedSystemJW', 'SystemMatchDistJW', 'PredictedSystemLV', 'SystemMatchDistLV'])], sort=False)
     
-    robjects.numpy2ri.activate()
+    numpy2ri.activate()
     stringdist = importr('stringdist', lib_loc=config.lib_loc)
 
     if config.print_status == 'Y':
@@ -315,29 +319,29 @@ def add_string_distance_features():
     for i in range(nrows):
         if i % 500 == 0 and config.print_status == 'Y':
             print('Matching', i, '/', nrows)
-        matches = stringdist.stringdist(unique_combos.loc[i, 'TestNameMapJW'], unique_components,
+        matches = stringdist.stringdist(unique_combos.at[i, 'TestNameMapJW'], unique_components,
             method='jw', p=0)
         bestmatch = np.argmin(matches)
-        unique_combos.loc[i, 'PredictedComponentJW'] = unique_components[bestmatch]
-        unique_combos.loc[i, 'ComponentMatchDistJW'] = matches[bestmatch]
+        unique_combos.at[i, 'PredictedComponentJW'] = unique_components[bestmatch]
+        unique_combos.at[i, 'ComponentMatchDistJW'] = matches[bestmatch]
 
-        matches = stringdist.stringdist(unique_combos.loc[i, 'TestNameMapLV'], unique_components,
+        matches = stringdist.stringdist(unique_combos.at[i, 'TestNameMapLV'], unique_components,
             method='lv')
         bestmatch = np.argmin(matches)
-        unique_combos.loc[i, 'PredictedComponentLV'] = unique_components[bestmatch]
-        unique_combos.loc[i, 'ComponentMatchDistLV'] = matches[bestmatch]
+        unique_combos.at[i, 'PredictedComponentLV'] = unique_components[bestmatch]
+        unique_combos.at[i, 'ComponentMatchDistLV'] = matches[bestmatch]
 
-        matches = stringdist.stringdist(unique_combos.loc[i, 'SpecimenMapJW'], unique_system,
+        matches = stringdist.stringdist(unique_combos.at[i, 'SpecimenMapJW'], unique_system,
             method='jw', p=0)
         bestmatch = np.argmin(matches)
-        unique_combos.loc[i, 'PredictedSystemJW'] = unique_system[bestmatch]
-        unique_combos.loc[i, 'SystemMatchDistJW'] = matches[bestmatch]
+        unique_combos.at[i, 'PredictedSystemJW'] = unique_system[bestmatch]
+        unique_combos.at[i, 'SystemMatchDistJW'] = matches[bestmatch]
 
-        matches = stringdist.stringdist(unique_combos.loc[i, 'SpecimenMapLV'], unique_system,
+        matches = stringdist.stringdist(unique_combos.at[i, 'SpecimenMapLV'], unique_system,
             method='lv')
         bestmatch = np.argmin(matches)
-        unique_combos.loc[i, 'PredictedSystemLV'] = unique_system[bestmatch]
-        unique_combos.loc[i, 'SystemMatchDistLV'] = matches[bestmatch]
+        unique_combos.at[i, 'PredictedSystemLV'] = unique_system[bestmatch]
+        unique_combos.at[i, 'SystemMatchDistLV'] = matches[bestmatch]
         
     dat = dat.merge(unique_combos, how='left', left_on=['TestNameMapLV', 'TestNameMapJW', 'SpecimenMapLV',
        'SpecimenMapJW'], right_on=['TestNameMapLV', 'TestNameMapJW', 'SpecimenMapLV',
